@@ -1,15 +1,386 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Chess Game</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <div class="board"></div>
-    <div class="timer">
-      <div class="white-timer">00:00</div>
-      <div class="black-timer">00:00</div>
-    </div>
-    <script src="script.js"></script>
-  </body>
-</html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chess Game</title>
+  <style>
+    .board {
+      display: flex;
+      flex-wrap: wrap;
+      width: 400px;
+      height: 400px;
+      border: 1px solid black;
+    }
+    .square {
+      width: 50px;
+      height: 50px;
+      text-align: center;
+      line-height: 50px;
+      font-size: 30px;
+      cursor: pointer;
+    }
+    .selected {
+      background-color: #5f9ea0;
+    }
+  </style>
+</head>
+<body>
+  <div class="board"></div>
+  <script>
+    // Chess board representation
+    const board = [
+      ['br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br'],
+      ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
+      ['', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
+      ['wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr'],
+    ];
+
+    // Current turn (white or black)
+    let turn = 'w';
+
+    // Selected piece
+    let selectedPiece = null;
+
+    // Timer variables
+    let whiteTimer = 0;
+    let blackTimer = 0;
+    let intervalId = null;
+
+    // Initialize the board
+    const boardElement = document.querySelector('.board');
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const square = document.createElement('div');
+        square.classList.add('square');
+        if ((rank + file) % 2 === 0) {
+          square.style.backgroundColor = '#f0d9b5';
+        } else {
+          square.style.backgroundColor = '#b58863';
+        }
+        square.dataset.rank = rank;
+        square.dataset.file = file;
+        square.textContent = board[rank][file];
+        boardElement.appendChild(square);
+        square.addEventListener('click', () => {
+          const rank = parseInt(square.dataset.rank);
+          const file = parseInt(square.dataset.file);
+          if (selectedPiece === null) {
+            if (board[rank][file] !== '' && board[rank][file].charAt(0) === turn) {
+              square.classList.add('selected');
+              selectedPiece = { rank, file };
+              getLegalMoves(rank, file).forEach(move => {
+                const targetSquare = document.querySelector(`.square[data-rank='${move.rank}'][data-file='${move.file}']`);
+                targetSquare.classList.add('selected');
+              });
+            }
+          } else {
+            const legalMoves = getLegalMoves(selectedPiece.rank, selectedPiece.file);
+            const isLegalMove = legalMoves.some(move => move.rank === rank && move.file === file);
+            if (isLegalMove) {
+              movePiece(selectedPiece.rank, selectedPiece.file, rank, file);
+              endTurn();
+            }
+            clearSelection();
+          }
+        });
+      }
+    }
+
+    // Get the legal moves for a piece
+    function getLegalMoves(rank, file) {
+      const piece = board[rank][file];
+      const color = piece.charAt(0);
+      const type = piece.charAt(1);
+      const legalMoves = [];
+      switch (type) {
+        case 'p':
+          const direction = color === 'w' ? -1 : 1;
+          const startRank = color === 'w' ? 6 : 1;
+          const isAtStartRank = rank === startRank;
+          const oneSquareAhead = board[rank + direction][file];
+          const twoSquaresAhead = board[rank + 2 * direction][file];
+          if (oneSquareAhead === '' && rank + direction >= 0 && rank + direction < 8) {
+            legalMoves.push({ rank: rank + direction, file });
+            if (isAtStartRank && twoSquaresAhead === '') {
+              legalMoves.push({ rank: rank + 2 * direction, file });
+            }
+          }
+          if (file > 0) {
+            const captureLeft = board[rank + direction][file - 1];
+            if (captureLeft !== '' && captureLeft.charAt(0) !== color) {
+              legalMoves.push({ rank: rank + direction, file: file - 1 });
+            }
+          }
+          if (file < 7){
+            const captureRight = board[rank + direction][file + 1];
+            if (captureRight !== '' && captureRight.charAt(0) !== color) {
+              legalMoves.push({ rank: rank + direction, file: file + 1 });
+            }
+          }
+          break;
+        case 'r':
+          for (let i = rank + 1; i < 8; i++) {
+            if (board[i][file] === '') {
+              legalMoves.push({ rank: i, file });
+            } else {
+              if (board[i][file].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1; i >= 0; i--) {
+            if (board[i][file] === '') {
+              legalMoves.push({ rank: i, file });
+            } else {
+              if (board[i][file].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file });
+              }
+              break;
+            }
+          }
+          for (let j = file + 1; j < 8; j++) {
+            if (board[rank][j] === '') {
+              legalMoves.push({ rank, file: j });
+            } else {
+              if (board[rank][j].charAt(0) !== color) {
+                legalMoves.push({ rank, file: j });
+              }
+              break;
+            }
+          }
+          for (let j = file - 1; j >= 0; j--) {
+            if (board[rank][j] === '') {
+              legalMoves.push({ rank, file: j });
+            } else {
+              if (board[rank][j].charAt(0) !== color) {
+                legalMoves.push({ rank, file: j });
+              }
+              break;
+            }
+          }
+          break;
+        case 'n':
+          const offsets = [
+            { rank: 2, file: 1 },
+            { rank: 2, file: -1 },
+            { rank: -2, file: 1 },
+            { rank: -2, file: -1 },
+            { rank: 1, file: 2 },
+            { rank: 1, file: -2 },
+            { rank: -1, file: 2 },
+            { rank: -1, file: -2 },
+          ];
+          offsets.forEach(offset => {
+            const targetRank = rank + offset.rank;
+            const targetFile = file + offset.file;
+            if (targetRank >= 0 && targetRank < 8 && targetFile >= 0 && targetFile < 8) {
+              if (board[targetRank][targetFile] === '' || board[targetRank][targetFile].charAt(0) !== color) {
+                legalMoves.push({ rank: targetRank, file: targetFile });
+              }
+            }
+          });
+          break;
+        case 'b':
+          for (let i = rank + 1, j = file + 1; i < 8 && j < 8; i++, j++) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank + 1, j = file - 1; i < 8 && j >= 0; i++, j--) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1, j = file + 1; i >= 0 && j < 8; i--, j++) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1, j = file - 1; i >= 0 && j >= 0; i--, j--) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          break;
+                  case 'q':
+          for (let i = rank + 1; i < 8; i++) {
+            if (board[i][file] === '') {
+              legalMoves.push({ rank: i, file });
+            } else {
+              if (board[i][file].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1; i >= 0; i--) {
+            if (board[i][file] === '') {
+              legalMoves.push({ rank: i, file });
+            } else {
+              if (board[i][file].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file });
+              }
+              break;
+            }
+          }
+          for (let j = file + 1; j < 8; j++) {
+            if (board[rank][j] === '') {
+              legalMoves.push({ rank, file: j });
+            } else {
+              if (board[rank][j].charAt(0) !== color) {
+                legalMoves.push({ rank, file: j });
+              }
+              break;
+            }
+          }
+          for (let j = file - 1; j >= 0; j--) {
+            if (board[rank][j] === '') {
+              legalMoves.push({ rank, file: j });
+            } else {
+              if (board[rank][j].charAt(0) !== color) {
+                legalMoves.push({ rank, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank + 1, j = file + 1; i < 8 && j < 8; i++, j++) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank + 1, j = file - 1; i < 8 && j >= 0; i++, j--) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1, j = file + 1; i >= 0 && j < 8; i--, j++) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          for (let i = rank - 1, j = file - 1; i >= 0 && j >= 0; i--, j--) {
+            if (board[i][j] === '') {
+              legalMoves.push({ rank: i, file: j });
+            } else {
+              if (board[i][j].charAt(0) !== color) {
+                legalMoves.push({ rank: i, file: j });
+              }
+              break;
+            }
+          }
+          break;
+        case 'k':
+          for (let i = rank - 1; i <= rank + 1; i++) {
+            for (let j = file - 1; j <= file + 1; j++) {
+              if (i >= 0 && i < 8 && j >= 0 && j < 8 && !(i === rank && j === file)) {
+                if (board[i][j] === '') {
+                  legalMoves.push({ rank: i, file: j });
+                } else {
+                  if (board[i][j].charAt(0) !== color) {
+                    legalMoves.push({ rank: i, file: j });
+                  }
+                }
+              }
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    });
+  });
+  return legalMoves;
+}
+   // Move a piece from one square to another
+function movePiece(startRank, startFile, endRank, endFile) {
+board[endRank][endFile] = board[startRank][startFile];
+board[startRank][startFile] = '';
+const startSquare = document.querySelector(.square[data-rank='${startRank}'][data-file='${startFile}']);
+const endSquare = document.querySelector(.square[data-rank='${endRank}'][data-file='${endFile}']);
+endSquare.textContent = startSquare.textContent;
+startSquare.textContent = '';
+}
+
+// Clear the selection and remove highlighting from all squares
+function clearSelection() {
+selectedPiece = null;
+const squares = document.querySelectorAll('.square');
+squares.forEach(square => {
+square.classList.remove('selected');
+});
+}
+
+// End the current turn and switch to the other player
+function endTurn() {
+if (turn === 'w') {
+turn = 'b';
+if (intervalId !== null) {
+clearInterval(intervalId);
+}
+intervalId = setInterval(() => {
+blackTimer++;
+const timerElement = document.querySelector('#black-timer');
+timerElement.textContent = formatTime(blackTimer);
+}, 1000);
+} else {
+turn = 'w';
+if (intervalId !== null) {
+clearInterval(intervalId);
+}
+intervalId = setInterval(() => {
+whiteTimer++;
+const timerElement = document.querySelector('#white-timer');
+timerElement.textContent = formatTime(whiteTimer);
+}, 1000);
+}
+clearSelection();
+}
+
+// Format a time in seconds as mm:ss
+function formatTime(time) {
+const minutes = Math.floor(time / 60);
+const seconds = time % 60;
+return ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')};
+}
+
+</script> <div> <p>White: <span id="white-timer">00:00</span></p> <p>Black: <span id="black-timer">00:00</span></p> </div> </body> </html>
